@@ -2,17 +2,15 @@ from typing import Any
 
 
 class AgentLoop:
-    """Minimal agent execution loop.
+    """Minimal agent loop with model and tool execution.
 
     Flow:
     observe -> decide -> act -> update
-
-    The decide step now uses the model interface.
     """
 
     def __init__(self, model=None, tools=None, memory=None):
         self.model = model
-        self.tools = tools or {}
+        self.tools = tools
         self.memory = memory
         self.history = []
 
@@ -32,7 +30,10 @@ class AgentLoop:
             self.memory.remember("current_task", task)
 
     def decide(self, task: str):
-        """Use LLM to decide the next action."""
+        """Use LLM to decide the next action.
+
+        Future versions will parse structured tool calls from the model.
+        """
         if self.model is None:
             return {
                 "type": "response",
@@ -53,8 +54,13 @@ class AgentLoop:
 
     def act(self, action):
         if action.get("type") == "tool":
-            tool_name = action["name"]
-            return self.tools[tool_name](**action.get("args", {}))
+            if self.tools is None:
+                raise RuntimeError("Tools are not configured")
+
+            return self.tools.run(
+                action["name"],
+                **action.get("args", {})
+            )
 
         return action.get("content")
 
