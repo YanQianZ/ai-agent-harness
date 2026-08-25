@@ -2,10 +2,10 @@ from typing import Any
 
 
 class AgentLoop:
-    """Minimal agent loop with model and tool execution.
+    """Agent loop with model, tools and memory integration.
 
     Flow:
-    observe -> decide -> act -> update
+    recall memory -> observe -> decide -> act -> update memory
     """
 
     def __init__(self, model=None, tools=None, memory=None):
@@ -15,9 +15,9 @@ class AgentLoop:
         self.history = []
 
     def run(self, task: str) -> Any:
-        self.observe(task)
+        context = self.observe(task)
 
-        action = self.decide(task)
+        action = self.decide(task, context)
 
         result = self.act(action)
 
@@ -26,24 +26,37 @@ class AgentLoop:
         return result
 
     def observe(self, task: str):
+        """Retrieve related memory before reasoning."""
+        context = {}
+
         if self.memory:
+            context = self.memory.recall(task)
             self.memory.remember("current_task", task)
 
-    def decide(self, task: str):
-        """Use LLM to decide the next action.
+        return context
 
-        Future versions will parse structured tool calls from the model.
-        """
+    def decide(self, task: str, context=None):
+        """Use memory context when creating model prompt."""
         if self.model is None:
             return {
                 "type": "response",
                 "content": task,
             }
 
+        prompt = f"""
+Task:
+{task}
+
+Relevant memory:
+{context}
+
+Decide the next action.
+"""
+
         response = self.model.generate([
             {
                 "role": "user",
-                "content": task,
+                "content": prompt,
             }
         ])
 
@@ -72,3 +85,11 @@ class AgentLoop:
 
         if self.memory:
             self.memory.remember("last_result", result)
+            self.memory.remember(
+                "experience",
+                {
+                    "task": task,
+                    "result": result,
+                },
+                memory_type="long_term"
+            )
