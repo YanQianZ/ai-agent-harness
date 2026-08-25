@@ -1,4 +1,4 @@
-from typing import Callable, Any
+from typing import Any
 
 
 class AgentLoop:
@@ -7,11 +7,7 @@ class AgentLoop:
     Flow:
     observe -> decide -> act -> update
 
-    This is the foundation for adding:
-    - LLM reasoning
-    - tool calling
-    - memory integration
-    - reflection
+    The decide step now uses the model interface.
     """
 
     def __init__(self, model=None, tools=None, memory=None):
@@ -36,10 +32,23 @@ class AgentLoop:
             self.memory.remember("current_task", task)
 
     def decide(self, task: str):
-        """Placeholder for LLM decision making."""
+        """Use LLM to decide the next action."""
+        if self.model is None:
+            return {
+                "type": "response",
+                "content": task,
+            }
+
+        response = self.model.generate([
+            {
+                "role": "user",
+                "content": task,
+            }
+        ])
+
         return {
             "type": "response",
-            "content": task,
+            "content": response,
         }
 
     def act(self, action):
